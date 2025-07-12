@@ -3,6 +3,9 @@
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import {
   Bold,
   Italic,
@@ -11,7 +14,8 @@ import {
   ListOrdered,
   Link,
   ImageIcon,
-  Smile,
+  Code,
+  Quote,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -53,7 +57,8 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
     { icon: ListOrdered, action: () => insertText("\n1. "), title: "Numbered List" },
     { icon: Link, action: () => insertText("[", "](url)"), title: "Link" },
     { icon: ImageIcon, action: () => insertText("![alt text](", ")"), title: "Image" },
-    { icon: Smile, action: () => insertText("😊"), title: "Emoji" },
+    { icon: Code, action: () => insertText("```\n", "\n```"), title: "Code Block" },
+    { icon: Quote, action: () => insertText("> "), title: "Quote" },
   ]
 
   const alignButtons = [
@@ -63,54 +68,60 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
   ]
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
       {/* Toolbar */}
-      <div className="bg-gray-50 border-b border-gray-200 p-2">
+      <div className="bg-gray-50 border-b border-gray-200 p-3">
         <div className="flex items-center gap-1 flex-wrap">
-          {formatButtons.map((button, index) => (
-            <Button
-              key={index}
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={button.action}
-              title={button.title}
-              className="h-8 w-8 p-0"
-            >
-              <button.icon className="w-4 h-4" />
-            </Button>
-          ))}
+          <div className="flex items-center gap-1">
+            {formatButtons.map((button, index) => (
+              <Button
+                key={index}
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={button.action}
+                title={button.title}
+                className="h-8 w-8 p-0 hover:bg-gray-200 transition-colors"
+              >
+                <button.icon className="w-4 h-4" />
+              </Button>
+            ))}
+          </div>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 mx-2" />
 
-          {alignButtons.map((button, index) => (
-            <Button
-              key={index}
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={button.action}
-              title={button.title}
-              className="h-8 w-8 p-0"
-            >
-              <button.icon className="w-4 h-4" />
-            </Button>
-          ))}
+          <div className="flex items-center gap-1">
+            {alignButtons.map((button, index) => (
+              <Button
+                key={index}
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={button.action}
+                title={button.title}
+                className="h-8 w-8 p-0 hover:bg-gray-200 transition-colors"
+              >
+                <button.icon className="w-4 h-4" />
+              </Button>
+            ))}
+          </div>
 
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex gap-1">
             <Button
               type="button"
-              variant={!isPreview ? "default" : "ghost"}
+              variant={!isPreview ? "default" : "outline"}
               size="sm"
               onClick={() => setIsPreview(false)}
+              className="transition-all"
             >
               Write
             </Button>
             <Button
               type="button"
-              variant={isPreview ? "default" : "ghost"}
+              variant={isPreview ? "default" : "outline"}
               size="sm"
               onClick={() => setIsPreview(true)}
+              className="transition-all"
             >
               Preview
             </Button>
@@ -121,9 +132,58 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
       {/* Editor/Preview */}
       <div className="min-h-[200px]">
         {isPreview ? (
-          <div className="p-4 prose max-w-none">
+          <div className="p-4 prose prose-sm max-w-none overflow-auto">
             {content ? (
-              <div dangerouslySetInnerHTML={{ __html: content.replace(/\n/g, "<br>") }} />
+              <ReactMarkdown 
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  // Custom styling for code blocks
+                  pre: ({ children }) => (
+                    <pre className="bg-gray-100 rounded-lg p-4 overflow-x-auto border border-gray-200">
+                      {children}
+                    </pre>
+                  ),
+                  code: ({ children, className, ...props }: any) => {
+                    const isInline = !className || !className.includes('language-')
+                    return isInline ? (
+                      <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono" {...props}>
+                        {children}
+                      </code>
+                    ) : (
+                      <code className="text-sm font-mono" {...props}>
+                        {children}
+                      </code>
+                    )
+                  },
+                  // Custom styling for blockquotes
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-700 bg-blue-50 py-2 rounded-r">
+                      {children}
+                    </blockquote>
+                  ),
+                  // Custom styling for tables
+                  table: ({ children }) => (
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300">
+                        {children}
+                      </table>
+                    </div>
+                  ),
+                  th: ({ children }) => (
+                    <th className="border border-gray-300 bg-gray-100 px-4 py-2 text-left font-semibold">
+                      {children}
+                    </th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="border border-gray-300 px-4 py-2">
+                      {children}
+                    </td>
+                  ),
+                }}
+              >
+                {content}
+              </ReactMarkdown>
             ) : (
               <p className="text-gray-500 italic">Nothing to preview</p>
             )}
@@ -133,8 +193,8 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
             ref={textareaRef}
             value={content}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            className="min-h-[200px] border-0 resize-none focus-visible:ring-0 rounded-none"
+            placeholder={placeholder || "Start writing your content here... Use the toolbar above for formatting options."}
+            className="min-h-[200px] border-0 resize-none focus-visible:ring-0 rounded-none p-4 font-mono text-sm leading-relaxed"
           />
         )}
       </div>
