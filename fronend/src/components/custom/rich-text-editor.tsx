@@ -19,7 +19,10 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Smile,
 } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Input } from "@/components/ui/input"
 
 interface RichTextEditorProps {
   content: string
@@ -27,8 +30,30 @@ interface RichTextEditorProps {
   placeholder?: string
 }
 
+
+const emojiCategories = {
+  smileys: {
+    title: "Smileys & People",
+    emojis: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🥸", "🤩", "🥳"]
+  },
+  gestures: {
+    title: "Gestures",
+    emojis: ["👍", "👎", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👋", "🤚", "🖐️", "✋", "🖖", "👏", "🙌", "🤲", "🤝", "🙏"]
+  },
+  objects: {
+    title: "Objects & Symbols",
+    emojis: ["💻", "📱", "⌨️", "🖥️", "🖨️", "📊", "📈", "📉", "💡", "🔒", "🔓", "🔑", "⚡", "🔥", "💯", "✅", "❌", "⭐", "🎯", "🚀", "💎", "🏆", "🎉", "🎊"]
+  },
+  nature: {
+    title: "Nature",
+    emojis: ["🌱", "🌿", "🍀", "🌳", "🌲", "🌴", "🌵", "🌸", "🌺", "🌻", "🌹", "🌷", "🌼", "💐", "🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🥝", "🍒", "🥥"]
+  }
+};
+
 export function RichTextEditor({ content, onChange, placeholder }: RichTextEditorProps) {
   const [isPreview, setIsPreview] = useState(false)
+  const [selectedEmojiCategory, setSelectedEmojiCategory] = useState<keyof typeof emojiCategories>('smileys')
+  const [emojiSearch, setEmojiSearch] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const insertText = (before: string, after = "") => {
@@ -42,11 +67,28 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
     const newText = content.substring(0, start) + before + selectedText + after + content.substring(end)
     onChange(newText)
 
-    // Restore cursor position
     setTimeout(() => {
       textarea.focus()
       textarea.setSelectionRange(start + before.length, end + before.length)
     }, 0)
+  }
+
+  const insertEmoji = (emoji: string) => {
+    insertText(emoji)
+  }
+
+ 
+  const getFilteredEmojis = () => {
+    if (!emojiSearch) {
+      return emojiCategories[selectedEmojiCategory].emojis;
+    }
+    
+    
+    const allEmojis = Object.values(emojiCategories).flatMap(cat => cat.emojis);
+    return allEmojis.filter(emoji => {
+     
+      return emoji.includes(emojiSearch);
+    });
   }
 
   const formatButtons = [
@@ -69,7 +111,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
   return (
     <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
-      {/* Toolbar */}
+  
       <div className="bg-gray-50 border-b border-gray-200 p-3">
         <div className="flex items-center gap-1 flex-wrap">
           <div className="flex items-center gap-1">
@@ -86,6 +128,94 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                 <button.icon className="w-4 h-4" />
               </Button>
             ))}
+            
+           
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  title="Insert Emoji"
+                  className="h-8 w-8 p-0 hover:bg-gray-200 transition-colors"
+                >
+                  <Smile className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="start">
+                <div className="p-3">
+                  <div className="text-sm font-medium mb-3">Insert Emoji</div>
+                  
+               
+                  <div className="mb-3">
+                    <Input
+                      placeholder="Search emojis..."
+                      value={emojiSearch}
+                      onChange={(e) => setEmojiSearch(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  
+                  {!emojiSearch && (
+                    <>
+                      
+                      <div className="mb-3">
+                        <div className="text-xs text-gray-600 mb-2">Quick Access</div>
+                        <div className="flex gap-1 flex-wrap">
+                          {["😀", "😍", "🤔", "👍", "👎", "❤️", "🎉", "🔥", "💯", "✅"].map((emoji, index) => (
+                            <button
+                              key={index}
+                              onClick={() => insertEmoji(emoji)}
+                              className="w-8 h-8 text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                              title={emoji}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                     
+                      <div className="flex gap-1 mb-3 border-b">
+                        {Object.entries(emojiCategories).map(([key, category]) => (
+                          <button
+                            key={key}
+                            onClick={() => setSelectedEmojiCategory(key as keyof typeof emojiCategories)}
+                            className={`px-2 py-1 text-xs rounded-t border-b-2 transition-colors ${
+                              selectedEmojiCategory === key
+                                ? 'border-blue-500 text-blue-600 bg-blue-50'
+                                : 'border-transparent text-gray-600 hover:text-gray-800'
+                            }`}
+                          >
+                            {category.title}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  
+                
+                  <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
+                    {getFilteredEmojis().map((emoji, index) => (
+                      <button
+                        key={index}
+                        onClick={() => insertEmoji(emoji)}
+                        className="w-8 h-8 text-lg hover:bg-gray-100 rounded transition-colors flex items-center justify-center"
+                        title={emoji}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {emojiSearch && getFilteredEmojis().length === 0 && (
+                    <div className="text-center text-gray-500 text-sm py-4">
+                      No emojis found
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="w-px h-6 bg-gray-300 mx-2" />
@@ -129,7 +259,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
         </div>
       </div>
 
-      {/* Editor/Preview */}
+      
       <div className="min-h-[200px]">
         {isPreview ? (
           <div className="p-4 prose prose-sm max-w-none overflow-auto">
@@ -138,7 +268,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeHighlight]}
                 components={{
-                  // Custom styling for code blocks
+                 
                   pre: ({ children }) => (
                     <pre className="bg-gray-100 rounded-lg p-4 overflow-x-auto border border-gray-200">
                       {children}
@@ -156,13 +286,13 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
                       </code>
                     )
                   },
-                  // Custom styling for blockquotes
+              
                   blockquote: ({ children }) => (
                     <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-700 bg-blue-50 py-2 rounded-r">
                       {children}
                     </blockquote>
                   ),
-                  // Custom styling for tables
+                  
                   table: ({ children }) => (
                     <div className="overflow-x-auto">
                       <table className="w-full border-collapse border border-gray-300">

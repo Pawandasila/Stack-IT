@@ -77,15 +77,36 @@ export function Navbar() {
                 </Link>
                 
                 {/* Notifications */}
-                <Button variant="ghost" size="icon" className="relative">
-                  <Bell className="h-5 w-5" />
-                  <Badge 
-                    variant="destructive" 
-                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-                  >
-                    3
-                  </Badge>
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative">
+                      <Bell className="h-5 w-5" />
+                      <Badge 
+                        variant="destructive" 
+                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                      >
+                        3
+                      </Badge>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <div className="p-2 text-sm font-semibold text-gray-700">Notifications</div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <span className="text-xs">You received a new message</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <span className="text-xs">Your answer was upvoted</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <span className="text-xs">Badge earned: Enthusiast</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <span className="text-xs text-blue-600">View all notifications</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {/* User Profile with Reputation */}
                 <div className="flex items-center space-x-2">
