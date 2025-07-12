@@ -31,7 +31,7 @@ export default function LoginPage() {
 
       if (result.success) {
         toast.success(result.message)
-        // Router push is handled in the auth context
+        
       } else {
         toast.error(result.message)
       }
@@ -47,11 +47,6 @@ export default function LoginPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome back</CardTitle>
           <CardDescription>Sign in to your StackIt account</CardDescription>
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg text-left">
-            <p className="text-sm font-medium text-blue-800 mb-1">Demo Credentials:</p>
-            <p className="text-xs text-blue-600">Email: test@example.com</p>
-            <p className="text-xs text-blue-600">Password: password123</p>
-          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -4,6 +4,7 @@
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { Dispatch, SetStateAction } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 interface User {
   id: string
@@ -44,6 +45,7 @@ interface GFContextType {
   register: (name: string, email: string, password: string) => Promise<LoginResponseType>;
   isLoading: boolean;
   isHydrated: boolean;
+  api: any; 
 }
 
 export type { GFContextType, User, UserInfoType, LoginResponseType, AccessTokenType };
@@ -59,11 +61,21 @@ const GFContext = createContext<GFContextType>({
   register: async () => ({ success: false, message: "" }),
   isLoading: false,
   isHydrated: false,
+  api: null,
 });
 
 const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Use localhost:3000 for Node.js backend
-  const baseURL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:3000';
+  
+  const baseURL = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080/api";
+
+  
+  const api = axios.create({
+    baseURL,
+    withCredentials: true,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 
   const router = useRouter();
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -71,29 +83,109 @@ const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [userInfo, setUserInfo] = useState<UserInfoType | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Handle hydration
+  
+  useEffect(() => {
+    
+    const requestInterceptor = api.interceptors.request.use(
+      (config) => {
+        if (authToken?.access) {
+          config.headers.Authorization = `Bearer ${authToken.access}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    
+    const responseInterceptor = api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        if (error.response?.status === 401 && authToken) {
+          
+          try {
+            const refreshResponse = await api.post('/users/refresh-token');
+            if (refreshResponse.data.success) {
+              const newToken = {
+                access: refreshResponse.data.data.accessToken,
+                refresh: authToken.refresh,
+              };
+              setAuthToken(newToken);
+              localStorage.setItem("accessToken", JSON.stringify(newToken));
+              
+              
+              error.config.headers.Authorization = `Bearer ${newToken.access}`;
+              return api.request(error.config);
+            }
+          } catch (refreshError) {
+            
+            userLogout();
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    
+    return () => {
+      api.interceptors.request.eject(requestInterceptor);
+      api.interceptors.response.eject(responseInterceptor);
+    };
+  }, [authToken]);
+
+  
+  const verifyToken = async () => {
+    try {
+      const response = await api.get('/users/profile');
+      if (response.data.success) {
+        const { user } = response.data.data;
+        const userData = {
+          id: user.id,
+          name: user.fullName || user.username,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar || "",
+          reputation: user.reputation || 0
+        };
+        setUserInfo(userData);
+        localStorage.setItem("userInfo", JSON.stringify(userData));
+      }
+    } catch (error) {
+      console.error("Token verification failed:", error);
+      
+      setAuthToken(null);
+      setUserInfo(null);
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("userInfo");
+    }
+  };
+
+  
   useEffect(() => {
     setIsHydrated(true);
-    // Load saved auth data after hydration
+    
     const savedToken = localStorage.getItem("accessToken");
     const savedUserInfo = localStorage.getItem("userInfo");
     
     if (savedToken) {
       try {
-        setAuthToken(JSON.parse(savedToken));
+        const tokenData = JSON.parse(savedToken);
+        setAuthToken(tokenData);
+        
+        
+        if (tokenData.access) {
+          verifyToken();
+        }
       } catch (error) {
         console.error("Error parsing saved token:", error);
         localStorage.removeItem("accessToken");
       }
     }
     
-    if (savedUserInfo) {
-      try {
-        setUserInfo(JSON.parse(savedUserInfo));
-      } catch (error) {
-        console.error("Error parsing saved user info:", error);
-        localStorage.removeItem("userInfo");
-      }
+    if (savedUserInfo && !savedToken) {
+      
+      localStorage.removeItem("userInfo");
     }
   }, []);
 
@@ -103,49 +195,62 @@ const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   ): Promise<LoginResponseType> => {
     setIsLoading(true);
     try {
-      // Mock authentication - simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock validation
-      if (email === "test@example.com" && password === "password123") {
-        // Mock token data
+      const response = await api.post('/users/login', {
+        email, 
+        password,
+      });
+
+      if (response.data.success) {
+        const { user, accessToken } = response.data; 
+        
         const tokenData = {
-          access: "mock-jwt-token-12345",
-          refresh: "mock-refresh-token-67890"
+          access: accessToken,
+          refresh: "", 
         };
         
-        // Mock user data
         const userData = {
-          id: "1",
-          name: "John Doe",
-          email: email,
-          role: "user",
-          avatar: "",
-          reputation: 1250
+          id: user.id,
+          name: user.name, 
+          email: user.email,
+          role: user.role,
+          avatar: "", 
+          reputation: 0 
         };
 
         setAuthToken(tokenData);
         setUserInfo(userData);
         localStorage.setItem("accessToken", JSON.stringify(tokenData));
         localStorage.setItem("userInfo", JSON.stringify(userData));
-        
-        // Store access token in cookie for middleware
-        document.cookie = `accessToken=${tokenData.access}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
-        document.cookie = `user_role=${encodeURIComponent(userData.role)}; path=/`;
 
-        // Check if there's a return URL, otherwise go to home
+        
         const urlParams = new URLSearchParams(window.location.search);
-        const returnUrl = urlParams.get('from') || '/';
+        const returnUrl = urlParams.get('from') || '/dashboard';
         router.push(returnUrl);
-        return { success: true, message: "Login successful" };
+        
+        return { 
+          success: true, 
+          message: response.data.message || "Login successful" 
+        };
       } else {
-        return { success: false, message: "Invalid email or password" };
+        return { 
+          success: false, 
+          message: response.data.message || "Login failed" 
+        };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
+      
+      let errorMessage = "Network error. Please check your connection.";
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return {
         success: false,
-        message: "Network error. Please check your connection.",
+        message: errorMessage,
       };
     } finally {
       setIsLoading(false);
@@ -159,39 +264,91 @@ const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   ): Promise<LoginResponseType> => {
     setIsLoading(true);
     try {
-      // Mock registration - simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await api.post('/users/register', {
+        name: name, 
+        email,
+        password,
+        bio: "New user", // Backend requires non-empty bio
+        role: "customer", 
+      });
+
       
-      // Simple validation - check if email already exists (mock)
-      if (email === "test@example.com") {
-        return {
-          success: false,
-          message: "Email already exists",
+      if (response.data.accessToken) { 
+        const { _id, name, email, role, bio, accessToken } = response.data;
+        
+        const tokenData = {
+          access: accessToken,
+          refresh: "", 
+        };
+        
+        const userData = {
+          id: _id,
+          name: name,
+          email: email,
+          role: role,
+          avatar: "",
+          reputation: 0
+        };
+
+        setAuthToken(tokenData);
+        setUserInfo(userData);
+        localStorage.setItem("accessToken", JSON.stringify(tokenData));
+        localStorage.setItem("userInfo", JSON.stringify(userData));
+
+        
+        router.push('/dashboard');
+        
+        return { 
+          success: true, 
+          message: "Registration successful!" 
+        };
+      } else {
+        return { 
+          success: false, 
+          message: response.data.message || "Registration failed" 
         };
       }
-      
-      // Mock successful registration
-      return { success: true, message: "Registration successful! Please login with your credentials." };
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error);
+      
+      let errorMessage = "Network error. Please check your connection.";
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       return {
         success: false,
-        message: "Network error. Please check your connection.",
+        message: errorMessage,
       };
     } finally {
       setIsLoading(false);
     }
   };
 
-  const userLogout = () => {
+  const userLogout = async () => {
+    try {
+      
+      await api.post('/users/logout');
+    } catch (error) {
+      console.error("Logout error:", error);
+      
+    }
+    
+    
     setAuthToken(null);
     setUserInfo(null);
-    typeof window !== "undefined" && localStorage.removeItem("accessToken");
-    typeof window !== "undefined" && localStorage.removeItem("userInfo");
     
-    // Clear cookies
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("userInfo");
+    }
+    
+    
     document.cookie = "accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    document.cookie = "refreshToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
     
     router.push("/");
   };
@@ -207,6 +364,7 @@ const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     register: userRegister,
     isLoading,
     isHydrated,
+    api,
   };
 
   return (
@@ -214,7 +372,19 @@ const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   );
 };
 
-// Custom hook to use the auth context
+
+export const createApiInstance = () => {
+  const baseURL = process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080/api";
+  return axios.create({
+    baseURL,
+    withCredentials: true,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+};
+
+
 const useAuth = () => {
   const context = useContext(GFContext);
   if (!context) {
