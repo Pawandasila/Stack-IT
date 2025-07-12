@@ -32,12 +32,12 @@ export function SearchAndFilter({ onFiltersChange }: SearchAndFilterProps) {
 
   const addTag = (tag: string) => {
     if (!selectedTags.includes(tag)) {
-      setSelectedTags([...selectedTags, tag])
+      setSelectedTags(prev => [...prev, tag])
     }
   }
 
   const removeTag = (tag: string) => {
-    setSelectedTags(selectedTags.filter((t) => t !== tag))
+    setSelectedTags(prev => prev.filter((t) => t !== tag))
   }
 
   const handleFilterChange = useCallback(async () => {
@@ -215,14 +215,34 @@ export function SearchAndFilter({ onFiltersChange }: SearchAndFilterProps) {
       {/* Selected Tags */}
       {selectedTags.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-200">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Active filters:</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedTags([])}
+              className="text-xs text-gray-500 hover:text-red-500 h-auto p-1"
+            >
+              Clear all
+            </Button>
           </div>
           <div className="flex flex-wrap gap-2">
             {selectedTags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                {tag}
-                <X className="w-3 h-3 cursor-pointer hover:text-red-500" onClick={() => removeTag(tag)} />
+              <Badge key={tag} variant="secondary" className="flex items-center gap-1 pr-1 py-1">
+                <span>{tag}</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    removeTag(tag);
+                  }}
+                  className="ml-1 hover:bg-red-100 hover:text-red-600 rounded-full p-1 transition-all duration-200 flex items-center justify-center"
+                  aria-label={`Remove ${tag} filter`}
+                  title={`Remove ${tag} filter`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </Badge>
             ))}
           </div>
